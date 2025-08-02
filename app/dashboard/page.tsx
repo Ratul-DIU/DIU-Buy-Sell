@@ -7,7 +7,7 @@ import { useAuth } from '@/app/providers'
 import { supabase } from '@/app/providers'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Edit, Trash2, Eye, Plus, Package } from 'lucide-react'
+import { Edit, Trash2, Eye, Plus, Package, AlertCircle, CheckCircle } from 'lucide-react'
 import { formatPrice, formatDate } from '@/lib/utils'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -30,8 +30,8 @@ export default function DashboardPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-
-
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   useEffect(() => {
     fetchUserProducts()
@@ -39,31 +39,36 @@ export default function DashboardPage() {
 
   const fetchUserProducts = async () => {
     try {
+      setError('')
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Error fetching products:', error)
+        setError('Failed to load your products. Please try again.')
         return
       }
 
       setProducts(data || [])
     } catch (error) {
       console.error('Error:', error)
+      setError('An unexpected error occurred. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
   const handleDelete = async (productId: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) {
+    if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
       return
     }
 
     setDeletingId(productId)
+    setError('')
+    setSuccess('')
 
     try {
       const { error } = await supabase
@@ -76,15 +81,22 @@ export default function DashboardPage() {
       }
 
       setProducts(products.filter(p => p.id !== productId))
+      setSuccess('Product deleted successfully!')
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000)
     } catch (error) {
       console.error('Error deleting product:', error)
-      alert('Failed to delete product')
+      setError('Failed to delete product. Please try again.')
     } finally {
       setDeletingId(null)
     }
   }
 
   const handleToggleSold = async (productId: string, currentStatus: boolean) => {
+    setError('')
+    setSuccess('')
+
     try {
       const { error } = await supabase
         .from('products')
@@ -98,9 +110,14 @@ export default function DashboardPage() {
       setProducts(products.map(p => 
         p.id === productId ? { ...p, is_sold: !currentStatus } : p
       ))
+      
+      setSuccess(`Product ${!currentStatus ? 'marked as sold' : 'marked as available'}!`)
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000)
     } catch (error) {
       console.error('Error updating product:', error)
-      alert('Failed to update product status')
+      setError('Failed to update product status. Please try again.')
     }
   }
 
@@ -109,7 +126,12 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navigation />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">Loading...</div>
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-400">Loading your dashboard...</p>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -139,6 +161,25 @@ export default function DashboardPage() {
             </Button>
           </Link>
         </div>
+
+        {/* Error and Success Messages */}
+        {error && (
+          <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <p className="text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <p className="text-green-800 dark:text-green-200">{success}</p>
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -223,12 +264,13 @@ export default function DashboardPage() {
                 )}
                 
                 <CardHeader className="p-0">
-                  <div className="relative h-48 w-full">
+                  <div className="relative h-48 w-full overflow-hidden">
                     <Image
                       src={product.image_url || '/placeholder.jpg'}
                       alt={product.title}
                       fill
                       className="object-cover rounded-t-lg"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   </div>
                 </CardHeader>
@@ -267,6 +309,7 @@ export default function DashboardPage() {
                       size="sm"
                       onClick={() => handleToggleSold(product.id, product.is_sold)}
                       className="flex-1"
+                      disabled={deletingId === product.id}
                     >
                       {product.is_sold ? 'Mark Available' : 'Mark Sold'}
                     </Button>

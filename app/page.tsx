@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatPrice, formatDate } from '@/lib/utils'
-import { Search, Filter, SortAsc, SortDesc } from 'lucide-react'
+import { Search, Filter, SortAsc, SortDesc, Package, AlertCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/app/providers'
 import Image from 'next/image'
@@ -31,6 +31,7 @@ export default function HomePage() {
   const [sortBy, setSortBy] = useState<'price' | 'date'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const categories = [
     'Electronics',
@@ -51,6 +52,8 @@ export default function HomePage() {
 
   const fetchProducts = async () => {
     try {
+      setError('')
+      
       // Check if Supabase is properly configured
       if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://your-project.supabase.co') {
         console.log('Supabase not configured, showing demo data')
@@ -67,12 +70,14 @@ export default function HomePage() {
 
       if (error) {
         console.error('Error fetching products:', error)
+        setError('Failed to load products. Please try again later.')
         setProducts([])
       } else {
         setProducts(data || [])
       }
     } catch (error) {
       console.error('Error:', error)
+      setError('An unexpected error occurred. Please try again later.')
       setProducts([])
     } finally {
       setLoading(false)
@@ -111,7 +116,12 @@ export default function HomePage() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navigation />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">Loading...</div>
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-400">Loading products...</p>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -179,13 +189,26 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <p className="text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          </div>
+        )}
+
         {/* Products Grid */}
         {filteredProducts.length === 0 ? (
           <div className="text-center py-12">
+            <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500 dark:text-gray-400 mb-4">
               {!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://your-project.supabase.co' 
                 ? 'Welcome! To get started, please configure your Supabase credentials in the .env.local file.'
-                : 'No products found.'
+                : searchTerm || selectedCategory !== 'all'
+                ? 'No products match your search criteria.'
+                : 'No products available at the moment.'
               }
             </p>
             {(!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://your-project.supabase.co') && (
@@ -206,14 +229,15 @@ export default function HomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProducts.map((product) => (
               <Link key={product.id} href={`/product/${product.id}`}>
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                   <CardHeader className="p-0">
-                    <div className="relative h-48 w-full">
+                    <div className="relative h-48 w-full overflow-hidden">
                       <Image
                         src={product.image_url || '/placeholder.jpg'}
                         alt={product.title}
                         fill
-                        className="object-cover rounded-t-lg"
+                        className="object-cover rounded-t-lg group-hover:scale-105 transition-transform duration-200"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                       />
                     </div>
                   </CardHeader>

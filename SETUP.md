@@ -1,71 +1,50 @@
 # DIU BUY & SELL - Setup Guide
 
-## 🚀 Quick Start
+This guide will help you set up the DIU BUY & SELL platform for production use.
 
-This guide will help you set up the DIU BUY & SELL application with Supabase backend.
-
-## 📋 Prerequisites
+## Prerequisites
 
 - Node.js 18+ installed
-- A Supabase account (free at [supabase.com](https://supabase.com))
-- An OpenAI API key (optional, for AI features)
+- A Supabase account (free tier available)
+- Optional: OpenAI API key for AI suggestions
 
-## 🔧 Step 1: Supabase Setup
+## Step 1: Environment Configuration
 
-### 1.1 Create Supabase Project
+1. Copy the example environment file:
+   ```bash
+   cp env.local.example .env.local
+   ```
 
-1. Go to [supabase.com](https://supabase.com) and sign up/login
-2. Click "New Project"
-3. Choose your organization
-4. Enter project details:
-   - **Name**: `diu-buy-sell` (or any name you prefer)
-   - **Database Password**: Create a strong password
-   - **Region**: Choose closest to your location
-5. Click "Create new project"
-6. Wait for the project to be created (2-3 minutes)
+2. Edit `.env.local` and add your credentials:
+   ```env
+   # Supabase Configuration
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-### 1.2 Get API Keys
+   # OpenAI Configuration (Optional)
+   OPENAI_API_KEY=your_openai_api_key
 
-1. In your Supabase dashboard, go to **Settings** → **API**
-2. Copy the following values:
-   - **Project URL** (starts with `https://`)
-   - **anon public** key (starts with `eyJ`)
+   # App Configuration
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   ```
 
-## 🔧 Step 2: Environment Variables
+## Step 2: Supabase Setup
 
-### 2.1 Create .env.local File
+### Create a Supabase Project
 
-Create a file named `.env.local` in your project root with the following content:
+1. Go to [supabase.com](https://supabase.com) and create a new project
+2. Wait for the project to be created (this may take a few minutes)
+3. Go to Settings > API to get your credentials
 
-```env
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url_here
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+### Database Schema
 
-# OpenAI Configuration (Optional)
-OPENAI_API_KEY=your_openai_api_key_here
-
-# App Configuration
-NEXT_PUBLIC_APP_URL=http://localhost:3001
-```
-
-### 2.2 Replace Placeholder Values
-
-Replace the placeholder values with your actual credentials:
-
-- `your_supabase_project_url_here` → Your Supabase Project URL
-- `your_supabase_anon_key_here` → Your Supabase anon public key
-- `your_supabase_service_role_key_here` → Your Supabase service role key (from Settings → API)
-- `your_openai_api_key_here` → Your OpenAI API key (optional)
-
-## 🔧 Step 3: Database Setup
-
-### 3.1 Create Database Tables
-
-In your Supabase dashboard, go to **SQL Editor** and run the following SQL:
+Run the following SQL in your Supabase SQL Editor:
 
 ```sql
+-- Enable Row Level Security
+ALTER TABLE auth.users ENABLE ROW LEVEL SECURITY;
+
 -- Create profiles table
 CREATE TABLE profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
@@ -79,19 +58,49 @@ CREATE TABLE profiles (
 CREATE TABLE products (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
-  description TEXT,
-  price DECIMAL(10,2) NOT NULL,
+  description TEXT NOT NULL,
+  price DECIMAL(10,2) NOT NULL CHECK (price > 0),
   category TEXT NOT NULL,
   image_url TEXT,
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   is_sold BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable Row Level Security
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+-- Create indexes for better performance
+CREATE INDEX idx_products_user_id ON products(user_id);
+CREATE INDEX idx_products_category ON products(category);
+CREATE INDEX idx_products_created_at ON products(created_at);
+CREATE INDEX idx_products_is_sold ON products(is_sold);
+
+-- Enable Row Level Security on products
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Users can view all products" ON products
+  FOR SELECT USING (true);
+
+CREATE POLICY "Users can create their own products" ON products
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own products" ON products
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own products" ON products
+  FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins can manage all products" ON products
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE profiles.id = auth.uid() 
+      AND profiles.role = 'admin'
+    )
+  );
+
+-- Enable Row Level Security on profiles
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for profiles
 CREATE POLICY "Users can view their own profile" ON profiles
@@ -100,24 +109,23 @@ CREATE POLICY "Users can view their own profile" ON profiles
 CREATE POLICY "Users can update their own profile" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
-CREATE POLICY "Users can insert their own profile" ON profiles
-  FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Admins can view all profiles" ON profiles
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE profiles.id = auth.uid() 
+      AND profiles.role = 'admin'
+    )
+  );
 
--- Create RLS policies for products
-CREATE POLICY "Anyone can view available products" ON products
-  FOR SELECT USING (is_sold = FALSE);
-
-CREATE POLICY "Users can view their own products" ON products
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert their own products" ON products
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update their own products" ON products
-  FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete their own products" ON products
-  FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Admins can update all profiles" ON profiles
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE profiles.id = auth.uid() 
+      AND profiles.role = 'admin'
+    )
+  );
 
 -- Create function to handle new user registration
 CREATE OR REPLACE FUNCTION handle_new_user()
@@ -133,112 +141,113 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
-```
 
-### 3.2 Create Storage Bucket
+-- Create storage bucket for product images
+INSERT INTO storage.buckets (id, name, public) VALUES ('product-images', 'product-images', true);
 
-1. Go to **Storage** in your Supabase dashboard
-2. Click **Create a new bucket**
-3. Name it `product-images`
-4. Set it as **Public**
-5. Click **Create bucket**
-
-### 3.3 Storage Policies
-
-Run this SQL in the SQL Editor:
-
-```sql
--- Allow public access to product images
-CREATE POLICY "Public access to product images" ON storage.objects
+-- Create storage policies
+CREATE POLICY "Anyone can view product images" ON storage.objects
   FOR SELECT USING (bucket_id = 'product-images');
 
--- Allow authenticated users to upload images
-CREATE POLICY "Users can upload product images" ON storage.objects
+CREATE POLICY "Authenticated users can upload product images" ON storage.objects
   FOR INSERT WITH CHECK (
     bucket_id = 'product-images' 
     AND auth.role() = 'authenticated'
   );
 
--- Allow users to update their own images
-CREATE POLICY "Users can update their own images" ON storage.objects
+CREATE POLICY "Users can update their own product images" ON storage.objects
   FOR UPDATE USING (
     bucket_id = 'product-images' 
     AND auth.uid()::text = (storage.foldername(name))[1]
   );
 
--- Allow users to delete their own images
-CREATE POLICY "Users can delete their own images" ON storage.objects
+CREATE POLICY "Users can delete their own product images" ON storage.objects
   FOR DELETE USING (
     bucket_id = 'product-images' 
     AND auth.uid()::text = (storage.foldername(name))[1]
   );
 ```
 
-## 🔧 Step 4: Restart Development Server
+### Storage Setup
 
-1. Stop your development server (Ctrl+C)
-2. Run: `yarn dev`
-3. The application should now work with authentication!
+1. Go to Storage in your Supabase dashboard
+2. Create a new bucket called `product-images`
+3. Set it to public
+4. Configure the storage policies (already included in the SQL above)
 
-## 🧪 Testing the Setup
+## Step 3: Install Dependencies
 
-1. Visit `http://localhost:3001`
-2. Click "Sign In" in the navigation
-3. Click "Sign up" to create an account
-4. Try posting a product
-5. Test the search and filter features
+```bash
+npm install
+```
 
-## 🔧 Step 5: OpenAI Setup (Optional)
+## Step 4: Run the Development Server
 
-For AI-powered product title and category suggestions:
+```bash
+npm run dev
+```
 
-1. Get an OpenAI API key from [platform.openai.com](https://platform.openai.com)
-2. Add it to your `.env.local` file
-3. The AI features will automatically work
+The application will be available at `http://localhost:3000`
 
-## 🚀 Deployment
+## Step 5: Create Admin User
 
-### Vercel Deployment
+1. Sign up with your email
+2. Go to your Supabase dashboard > SQL Editor
+3. Run this SQL to make yourself an admin:
+
+```sql
+UPDATE profiles 
+SET role = 'admin' 
+WHERE email = 'your-email@example.com';
+```
+
+## Step 6: Production Deployment
+
+### Deploy to Vercel (Recommended)
 
 1. Push your code to GitHub
 2. Connect your repository to Vercel
 3. Add your environment variables in Vercel dashboard
-4. Deploy!
+4. Deploy
 
-## 🆘 Troubleshooting
+### Environment Variables for Production
+
+Make sure to update these in your production environment:
+
+```env
+NEXT_PUBLIC_APP_URL=https://your-domain.com
+```
+
+## Features
+
+- ✅ User authentication with Supabase Auth
+- ✅ Product listing and management
+- ✅ Image upload to Supabase Storage
+- ✅ Search and filtering
+- ✅ Admin panel for user and product management
+- ✅ AI-powered product suggestions (requires OpenAI API)
+- ✅ Responsive design
+- ✅ Dark mode support
+- ✅ Real-time updates
+- ✅ Role-based access control
+
+## Troubleshooting
 
 ### Common Issues
 
-1. **"Supabase is not configured"**
-   - Check that `.env.local` exists and has correct values
-   - Restart the development server
+1. **Authentication not working**: Check your Supabase URL and anon key
+2. **Images not uploading**: Verify storage bucket exists and policies are set
+3. **Database errors**: Run the SQL schema setup
+4. **Build errors**: Make sure all environment variables are set
 
-2. **"Invalid API key"**
-   - Verify your Supabase URL and anon key are correct
-   - Check that you copied the full keys
+### Support
 
-3. **"Table does not exist"**
-   - Run the SQL commands in Step 3.1
-   - Check that RLS policies are created
+If you encounter any issues, check the browser console for error messages and ensure all environment variables are properly configured.
 
-4. **"Image upload failed"**
-   - Create the storage bucket as described in Step 3.2
-   - Run the storage policies SQL
+## Security Notes
 
-### Getting Help
-
-- Check the browser console for error messages
-- Verify all environment variables are set correctly
-- Ensure Supabase project is active and not paused
-
-## 📝 Next Steps
-
-- Customize the UI colors and branding
-- Add more product categories
-- Implement real-time notifications
-- Add payment integration
-- Set up email notifications
-
----
-
-**Need help?** Check the [README.md](README.md) for more detailed information about the application features and architecture. 
+- Never commit your `.env.local` file to version control
+- Use environment variables for all sensitive data
+- Regularly update dependencies
+- Monitor your Supabase usage and costs
+- Consider implementing rate limiting for production use 

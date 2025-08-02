@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { useAuth } from '@/app/providers'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth()
@@ -18,18 +18,35 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setSuccess('')
     setLoading(true)
 
     try {
       // Check if Supabase is properly configured
       if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://your-project.supabase.co') {
         setError('Supabase is not configured. Please set up your environment variables first.')
+        setLoading(false)
+        return
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        setError('Please enter a valid email address')
+        setLoading(false)
+        return
+      }
+
+      // Validate password
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters long')
         setLoading(false)
         return
       }
@@ -42,16 +59,30 @@ export default function AuthPage() {
 
       if (isLogin) {
         await signIn(email, password)
+        setSuccess('Successfully signed in!')
       } else {
         await signUp(email, password)
+        setSuccess('Account created successfully! Please check your email to verify your account.')
       }
 
-      router.push('/')
+      // Redirect after a short delay to show success message
+      setTimeout(() => {
+        router.push('/')
+      }, 1500)
     } catch (error: any) {
-      setError(error.message || 'An error occurred')
+      console.error('Auth error:', error)
+      setError(error.message || 'An error occurred during authentication')
     } finally {
       setLoading(false)
     }
+  }
+
+  const clearForm = () => {
+    setEmail('')
+    setPassword('')
+    setConfirmPassword('')
+    setError('')
+    setSuccess('')
   }
 
   return (
@@ -102,6 +133,7 @@ export default function AuthPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -114,11 +146,13 @@ export default function AuthPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10"
                   required
+                  disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  disabled={loading}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -134,11 +168,13 @@ export default function AuthPage() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="pl-10 pr-10"
                     required
+                    disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    disabled={loading}
                   >
                     {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -146,8 +182,16 @@ export default function AuthPage() {
               )}
 
               {error && (
-                <div className="text-red-600 text-sm text-center">
+                <div className="flex items-center gap-2 text-red-600 text-sm">
+                  <AlertCircle className="h-4 w-4" />
                   {error}
+                </div>
+              )}
+
+              {success && (
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <CheckCircle className="h-4 w-4" />
+                  {success}
                 </div>
               )}
 
@@ -166,12 +210,10 @@ export default function AuthPage() {
                 <button
                   onClick={() => {
                     setIsLogin(!isLogin)
-                    setError('')
-                    setEmail('')
-                    setPassword('')
-                    setConfirmPassword('')
+                    clearForm()
                   }}
                   className="text-primary-600 hover:text-primary-700 font-medium"
+                  disabled={loading}
                 >
                   {isLogin ? 'Sign up' : 'Sign in'}
                 </button>

@@ -7,7 +7,7 @@ import { useAuth } from '@/app/providers'
 import { supabase } from '@/app/providers'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, User, Calendar, Tag, MessageCircle } from 'lucide-react'
+import { ArrowLeft, User, Calendar, Tag, MessageCircle, AlertCircle, CheckCircle } from 'lucide-react'
 import { formatPrice, formatDate } from '@/lib/utils'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -32,13 +32,17 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   useEffect(() => {
-    fetchProduct()
+    if (params.id) {
+      fetchProduct()
+    }
   }, [params.id])
 
   const fetchProduct = async () => {
     try {
+      setError('')
       const { data, error } = await supabase
         .from('products')
         .select(`
@@ -50,7 +54,7 @@ export default function ProductDetailPage() {
 
       if (error) {
         console.error('Error fetching product:', error)
-        setError('Product not found')
+        setError('Product not found or has been removed')
         return
       }
 
@@ -60,9 +64,42 @@ export default function ProductDetailPage() {
       })
     } catch (error) {
       console.error('Error:', error)
-      setError('Failed to load product')
+      setError('Failed to load product details')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleToggleSold = async () => {
+    if (!product) return
+
+    setError('')
+    setSuccess('')
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_sold: !product.is_sold })
+        .eq('id', product.id)
+
+      if (error) {
+        throw error
+      }
+
+      setProduct({ ...product, is_sold: !product.is_sold })
+      setSuccess(`Product ${!product.is_sold ? 'marked as sold' : 'marked as available'}!`)
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (error) {
+      console.error('Error updating product:', error)
+      setError('Failed to update product status')
+    }
+  }
+
+  const handleContactSeller = () => {
+    if (product?.user_email) {
+      window.open(`mailto:${product.user_email}?subject=Inquiry about ${product.title}`, '_blank')
     }
   }
 
@@ -71,7 +108,12 @@ export default function ProductDetailPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navigation />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">Loading...</div>
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-400">Loading product details...</p>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -83,11 +125,12 @@ export default function ProductDetailPage() {
         <Navigation />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
+            <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Product Not Found
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              The product you're looking for doesn't exist or has been removed.
+              {error || 'The product you\'re looking for doesn\'t exist or has been removed.'}
             </p>
             <Link href="/">
               <Button>
@@ -116,15 +159,27 @@ export default function ProductDetailPage() {
           </Link>
         </div>
 
+        {/* Success Message */}
+        {success && (
+          <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <p className="text-green-800 dark:text-green-200">{success}</p>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Product Image */}
           <div className="space-y-4">
-            <div className="relative aspect-square w-full">
+            <div className="relative aspect-square w-full overflow-hidden rounded-lg">
               <Image
                 src={product.image_url || '/placeholder.jpg'}
                 alt={product.title}
                 fill
-                className="object-cover rounded-lg"
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+                priority
               />
               {product.is_sold && (
                 <div className="absolute top-4 right-4">
@@ -201,19 +256,29 @@ export default function ProductDetailPage() {
 
             {!product.is_sold && (
               <div className="space-y-4">
-                <Button className="w-full" size="lg">
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={handleContactSeller}
+                >
                   <MessageCircle className="h-4 w-4 mr-2" />
                   Contact Seller
                 </Button>
                 
                 {user && user.id === product.user_id && (
                   <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1">
-                      Edit Listing
-                    </Button>
-                    <Button variant="outline" className="flex-1">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={handleToggleSold}
+                    >
                       Mark as Sold
                     </Button>
+                    <Link href={`/product/${product.id}/edit`} className="flex-1">
+                      <Button variant="outline" className="w-full">
+                        Edit Listing
+                      </Button>
+                    </Link>
                   </div>
                 )}
               </div>

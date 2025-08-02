@@ -4,8 +4,14 @@ import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
   // Create Supabase client for middleware
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co'
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key'
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  
+  // If Supabase is not configured, allow all requests
+  if (!supabaseUrl || !supabaseAnonKey || supabaseUrl === 'https://your-project.supabase.co') {
+    return NextResponse.next()
+  }
+
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: false,
@@ -21,7 +27,9 @@ export async function middleware(req: NextRequest) {
     // Extract session from cookies
     const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
       const [key, value] = cookie.trim().split('=')
-      acc[key] = value
+      if (key && value) {
+        acc[key] = value
+      }
       return acc
     }, {} as Record<string, string>)
 
