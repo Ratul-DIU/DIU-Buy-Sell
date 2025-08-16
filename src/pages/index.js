@@ -26,7 +26,7 @@ export default function Home(){
             <ProductCard key={p.id} product={p} id={p.id} />
           ))}
         </div>
-        <div className="footer">Made for DIU students • Deploy on Vercel • Configure Firebase env vars</div>
+        <div className="footer">Made for DIU students • Sage </div>
       </main>
     </>
   );
