@@ -33,7 +33,6 @@ export default function FullScreenHeader() {
     { href: '/', label: 'Home' },
     { href: '/add-product', label: 'Add Product' },
     ...(user ? [{ href: '/dashboard', label: 'Dashboard' }] : []),
-    { href: '/admin', label: 'Admin' },
   ];
 
   return (
