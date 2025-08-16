@@ -5,11 +5,12 @@ import { auth } from '../firebase';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 
-export default function FullScreenHeader() {
+export default function FullScreenHeader({ onSearchChange }) {
   const { user } = useAuth();
   const router = useRouter();
   const [theme, setTheme] = useState('dark');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -29,6 +30,14 @@ export default function FullScreenHeader() {
     router.push('/');
   }
 
+  const handleSearch = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    if (onSearchChange) {
+      onSearchChange(query);
+    }
+  };
+
   const navItems = [
     { href: '/', label: 'Home' },
     { href: '/add-product', label: 'Add Product' },
@@ -42,7 +51,19 @@ export default function FullScreenHeader() {
           {/* Brand */}
           <Link href="/" legacyBehavior>
             <a className="brand" aria-label="Home - DIU Buy & Sell" onClick={() => setMenuOpen(false)}>
-              <div className="logo" aria-hidden="true" tabIndex={-1}>DIU</div>
+              <div className="logo">
+                <span style={{
+                  fontWeight: 'bold',
+                  fontSize: '28px',
+                  color: '#1E3A8A',
+                  letterSpacing: '2px',
+                  textShadow: '1px 1px 2px rgba(0,0,0,0.2)',
+                  fontFamily: "'Poppins', sans-serif"
+                }}>
+                  DIU
+                </span>
+              </div>
+
               <div className="title">
                 <div className="name">DIU Buy & Sell</div>
                 <div className="tag">University Marketplace</div>
@@ -59,6 +80,8 @@ export default function FullScreenHeader() {
               className="search-input"
               spellCheck="false"
               autoComplete="off"
+              value={searchQuery}
+              onChange={handleSearch}
             />
             <svg
               className="search-icon"
@@ -105,7 +128,7 @@ export default function FullScreenHeader() {
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
-              {theme === 'dark' ? '🌞 Light' : '🌙 Dark'}
+              {theme === 'dark' ? '☁️ Light' : '⚪ Dark'}
             </button>
           </nav>
 
@@ -123,49 +146,48 @@ export default function FullScreenHeader() {
         </div>
 
         {/* Mobile Menu */}
-        {/* Mobile Menu */}
-<nav className={`nav-mobile ${menuOpen ? 'open' : ''}`} aria-label="Mobile Navigation">
-  {navItems.map(({ href, label }) => (
-    <Link href={href} key={label} legacyBehavior>
-      <a className="nav-link-mobile" onClick={() => setMenuOpen(false)}>{label}</a>
-    </Link>
-  ))}
+        <nav className={`nav-mobile${menuOpen ? ' open' : ''}`} aria-label="Mobile Navigation">
+          {navItems.map(({ href, label }) => (
+            <Link href={href} key={label} legacyBehavior>
+              <a className="nav-link-mobile" onClick={() => setMenuOpen(false)}>{label}</a>
+            </Link>
+          ))}
 
-  {user ? (
-    <button
-      onClick={() => {
-        logout();
-        setMenuOpen(false);
-      }}
-      className="btn btn-logout-mobile"
-      type="button"
-    >
-      Log out
-    </button>
-  ) : (
-    <>
-      <Link href="/login" legacyBehavior>
-        <a className="btn btn-login-mobile" onClick={() => setMenuOpen(false)}>Login</a>
-      </Link>
-      <Link href="/register" legacyBehavior>
-        <a className="btn btn-register-mobile" onClick={() => setMenuOpen(false)}>Register</a>
-      </Link>
-    </>
-  )}
+          {user ? (
+            <button
+              onClick={() => {
+                logout();
+                setMenuOpen(false);
+              }}
+              className="btn btn-logout-mobile"
+              type="button"
+            >
+              Log out
+            </button>
+          ) : (
+            <>
+              <Link href="/login" legacyBehavior>
+                <a className="btn btn-login-mobile" onClick={() => setMenuOpen(false)}>Login</a>
+              </Link>
+              <Link href="/register" legacyBehavior>
+                <a className="btn btn-register-mobile" onClick={() => setMenuOpen(false)}>Register</a>
+              </Link>
+            </>
+          )}
 
-  <button
-    onClick={() => {
-      toggleTheme();
-      setMenuOpen(false);
-    }}
-    className="btn btn-theme-toggle-mobile"
-    aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-  >
-    {theme === 'dark' ? '🌞 Light' : '🌙 Dark'}
-  </button>
-</nav>
-
+          <button
+            onClick={() => {
+              toggleTheme();
+              setMenuOpen(false);
+            }}
+            className="btn btn-theme-toggle-mobile"
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? '☁️ Light' : '⚪ Dark'}
+          </button>
+        </nav>
       </header>
+
 
       <style jsx>{`
         /* Root & Container */
