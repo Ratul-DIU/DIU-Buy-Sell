@@ -123,46 +123,48 @@ export default function FullScreenHeader() {
         </div>
 
         {/* Mobile Menu */}
-        <nav className={`nav-mobile${menuOpen ? ' open' : ''}`} aria-label="Mobile Navigation">
-          {navItems.map(({ href, label }) => (
-            <Link href={href} key={label} legacyBehavior>
-              <a className="nav-link-mobile" onClick={() => setMenuOpen(false)}>{label}</a>
-            </Link>
-          ))}
+        {/* Mobile Menu */}
+<nav className={`nav-mobile ${menuOpen ? 'open' : ''}`} aria-label="Mobile Navigation">
+  {navItems.map(({ href, label }) => (
+    <Link href={href} key={label} legacyBehavior>
+      <a className="nav-link-mobile" onClick={() => setMenuOpen(false)}>{label}</a>
+    </Link>
+  ))}
 
-          {user ? (
-            <button
-              onClick={() => {
-                logout();
-                setMenuOpen(false);
-              }}
-              className="btn btn-logout-mobile"
-              type="button"
-            >
-              Log out
-            </button>
-          ) : (
-            <>
-              <Link href="/login" legacyBehavior>
-                <a className="btn btn-login-mobile" onClick={() => setMenuOpen(false)}>Login</a>
-              </Link>
-              <Link href="/register" legacyBehavior>
-                <a className="btn btn-register-mobile" onClick={() => setMenuOpen(false)}>Register</a>
-              </Link>
-            </>
-          )}
+  {user ? (
+    <button
+      onClick={() => {
+        logout();
+        setMenuOpen(false);
+      }}
+      className="btn btn-logout-mobile"
+      type="button"
+    >
+      Log out
+    </button>
+  ) : (
+    <>
+      <Link href="/login" legacyBehavior>
+        <a className="btn btn-login-mobile" onClick={() => setMenuOpen(false)}>Login</a>
+      </Link>
+      <Link href="/register" legacyBehavior>
+        <a className="btn btn-register-mobile" onClick={() => setMenuOpen(false)}>Register</a>
+      </Link>
+    </>
+  )}
 
-          <button
-            onClick={() => {
-              toggleTheme();
-              setMenuOpen(false);
-            }}
-            className="btn btn-theme-toggle-mobile"
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          >
-            {theme === 'dark' ? '🌞 Light' : '🌙 Dark'}
-          </button>
-        </nav>
+  <button
+    onClick={() => {
+      toggleTheme();
+      setMenuOpen(false);
+    }}
+    className="btn btn-theme-toggle-mobile"
+    aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+  >
+    {theme === 'dark' ? '🌞 Light' : '🌙 Dark'}
+  </button>
+</nav>
+
       </header>
 
       <style jsx>{`
